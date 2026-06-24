@@ -1,0 +1,61 @@
+# Depth Analyse
+
+**Raspberry Pi 5 based 360° Groove Detection System** using a continuous rotation servo and ToF sensor.
+
+---
+
+## 📌 Project Overview
+
+**Depth Analyse** is a non-contact groove/depth measurement system built on the Raspberry Pi 5. It rotates a specimen (or the sensor) using a **MG996R 360° continuous rotation servo** while measuring distance with a **VL53L0X Time-of-Flight sensor** at regular angular intervals.
+
+The system detects grooves by comparing measured distance against a calculated surface baseline and generates both CSV data and a visual graph.
+
+---
+
+## 🎯 What We Tried to Build
+
+We wanted to create an **automated angular depth scanner** that can:
+
+- Rotate 360° continuously using a hobby servo
+- Take distance readings at every 2° interval
+- Identify grooves/depressions on a surface
+- Report groove depth, angular position, and width
+- Work reliably on Raspberry Pi 5 (which has stricter GPIO requirements)
+
+---
+
+## ⚙️ Servo Implementation (Technical Details)
+
+### Why MG996R Continuous Rotation Servo?
+
+- Standard hobby servos only rotate ~180°.
+- We needed **full 360° continuous rotation** to scan the complete circumference of an object.
+- The **MG996R 360° version** was chosen because it is cheap, widely available, and provides decent torque.
+
+### How Continuous Rotation Works
+
+Unlike normal servos, the MG996R 360° version does **not** use position control. Instead:
+
+- Pulse width controls **direction and speed**:
+  - `1500 µs` → Stop
+  - `< 1500 µs` (e.g. 1350 µs) → Rotate in one direction
+  - `> 1500 µs` (e.g. 1600 µs) → Rotate in opposite direction
+
+### Technical Challenges Faced
+
+| Challenge                    | Problem                                      | Solution                                      |
+|-----------------------------|----------------------------------------------|-----------------------------------------------|
+| GPIO on Pi 5                | `pigpio` not available in Debian Trixie      | Switched to `lgpio` library                   |
+| GPIO busy error             | Pin already claimed by previous process      | Added `gpio_free()` + cleanup before claiming |
+| Jittery / weak rotation     | Incorrect PWM calculation                    | Used precise microsecond-based PWM (1350 µs)  |
+| Unreliable rotation         | Software PWM (gpiozero) causing jitter       | Moved to hardware PWM via `lgpio.tx_pwm()`    |
+| Servo not spinning          | Wrong duty cycle calculation                 | Final working value: **1350 µs**              |
+
+### Final Servo Control Method
+
+We used **hardware PWM** through `lgpio`:
+
+```python
+def set_servo(microseconds):
+    duty = (microseconds / 20000.0) * 100
+    lgpio.tx_pwm(h, SERVO_PIN, 50, duty)
