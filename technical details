@@ -59,3 +59,29 @@ We used **hardware PWM** through `lgpio`:
 def set_servo(microseconds):
     duty = (microseconds / 20000.0) * 100
     lgpio.tx_pwm(h, SERVO_PIN, 50, duty)
+```
+
+### Servo Rotation Fix
+
+The scan code must treat the MG996R 360-degree model as a speed-controlled motor, not as a position servo. It cannot be commanded to move to a specific angle; it can only be told to stop, spin one way, or spin the other way.
+
+The updated control logic uses:
+
+- `1500 us` as neutral/stop
+- `1350 us` as the normal scan pulse
+- `1650 us` as the reverse-direction test pulse
+- `SECONDS_PER_REVOLUTION` as the calibration value for the real loaded turntable
+
+To test free rotation before scanning:
+
+```bash
+python3 src/depth_analyse.py --servo-test
+```
+
+If the servo still does not rotate freely:
+
+- Use an external 5-6 V supply for the servo.
+- Connect servo ground and Raspberry Pi ground together.
+- Check that the signal wire is on GPIO 18 / physical pin 12.
+- Increase the speed difference from neutral, for example `1300 us` or `1700 us`.
+- Recalibrate `SECONDS_PER_REVOLUTION` after changing the pulse width or load.
