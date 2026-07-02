@@ -1,6 +1,3 @@
-# depth_analyse
-Raspberry Pi 5 groove detection system using MG996R 360° servo + VL53L0X ToF sensor with real-time graphing.
-cat > README.md << 'EOF'
 # Depth Analyse
 
 Raspberry Pi 5 based **groove detection system** using continuous rotation servo and ToF sensor.
@@ -40,3 +37,15 @@ sudo apt install -y python3-pip python3-dev libatlas-base-dev
 
 # Install Python packages
 pip3 install -r requirements.txt
+
+# Test only the servo
+python3 src/depth_analyse.py --servo-test
+```
+
+## Running a Scan
+
+```bash
+python3 src/depth_analyse.py
+```
+
+The MG996R 360-degree servo is speed-controlled, not position-controlled. Tune `SERVO_RUN_US` for direction/speed and `SECONDS_PER_REVOLUTION` for the measured time of one full turn with the real load attached.

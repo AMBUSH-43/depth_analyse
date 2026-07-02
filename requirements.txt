@@ -1,7 +1,5 @@
-cat > requirements.txt << EOF
 lgpio
 adafruit-blinka
 adafruit-circuitpython-vl53l0x
 numpy
 matplotlib
-EOF
