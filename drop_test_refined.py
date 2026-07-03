@@ -40,7 +40,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 import matplotlib
 
@@ -533,6 +533,7 @@ def run_scan(
     is_after: bool,
     duration_s: float | None,
     auto: bool,
+    progress: Callable[[dict[str, float | str]], None] | None = None,
 ) -> pd.DataFrame:
     rows: list[dict[str, float | str]] = []
     start = time.perf_counter()
@@ -558,14 +559,15 @@ def run_scan(
             dist = sensor.read_mm(angle, is_after=is_after)
 
             if dist is not None:
-                rows.append(
-                    {
+                reading: dict[str, float | str] = {
                         "scan": name,
                         "timestamp_s": elapsed,
                         "angle_deg": angle,
                         "distance_mm": dist,
                     }
-                )
+                rows.append(reading)
+                if progress is not None:
+                    progress(reading)
                 print(
                     f"\r  {len(rows):3d} pts | {dist:7.2f} mm | {angle:6.1f} deg",
                     end="",

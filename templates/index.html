@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Depth Analyse — Drop Lab</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+    :root{--ink:#eaf2ef;--muted:#8ca39d;--panel:rgba(12,25,25,.72);--line:rgba(154,226,207,.12);--mint:#75f4c5;--cyan:#57c7ff;--amber:#ffcb6b;--red:#ff6b7a;--bg:#061010}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+    body:before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 8% 5%,rgba(36,160,124,.19),transparent 34%),radial-gradient(circle at 92% 15%,rgba(40,126,170,.14),transparent 32%),linear-gradient(rgba(117,244,197,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(117,244,197,.025) 1px,transparent 1px);background-size:auto,auto,44px 44px,44px 44px;pointer-events:none}
+    .orb{position:fixed;width:420px;height:420px;border:1px solid rgba(117,244,197,.08);border-radius:50%;right:-180px;top:35%;animation:spin 35s linear infinite;pointer-events:none}.orb:after,.orb:before{content:"";position:absolute;border:inherit;border-radius:inherit;inset:48px}.orb:after{inset:110px}@keyframes spin{to{transform:rotate(360deg)}}
+    header{height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 4vw;border-bottom:1px solid var(--line);backdrop-filter:blur(15px);position:sticky;top:0;z-index:10;background:rgba(6,16,16,.72)}
+    .brand{display:flex;align-items:center;gap:13px;font-weight:700;letter-spacing:-.03em}.mark{width:35px;height:35px;border:1px solid var(--mint);border-radius:50%;display:grid;place-items:center;box-shadow:0 0 28px rgba(117,244,197,.22)}.mark i{width:9px;height:9px;background:var(--mint);border-radius:50%;box-shadow:0 0 14px var(--mint)}
+    .status-pill{font:12px 'Space Mono';color:var(--muted);display:flex;gap:8px;align-items:center}.dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint);animation:pulse 1.6s infinite}@keyframes pulse{50%{opacity:.3}}
+    main{max-width:1440px;margin:auto;padding:42px 4vw 80px}.hero{display:flex;justify-content:space-between;align-items:end;margin-bottom:34px;gap:30px}.eyebrow{font:11px 'Space Mono';letter-spacing:.18em;color:var(--mint);text-transform:uppercase}.hero h1{font-size:clamp(38px,5vw,72px);letter-spacing:-.06em;line-height:.94;margin:12px 0 0;max-width:760px}.hero h1 span{color:var(--muted);font-weight:400}.run-id{font:12px 'Space Mono';color:var(--muted);text-align:right}
+    .grid{display:grid;grid-template-columns:350px 1fr;gap:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;backdrop-filter:blur(22px);box-shadow:0 24px 70px rgba(0,0,0,.22);overflow:hidden}.pad{padding:24px}.panel-title{font:11px 'Space Mono';letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:22px}
+    label{display:block;color:var(--muted);font-size:12px;margin:15px 0 7px}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}select,input{width:100%;background:#091716;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:11px 12px;outline:none;font:13px 'Space Mono';transition:.2s}select:focus,input:focus{border-color:rgba(117,244,197,.55);box-shadow:0 0 0 3px rgba(117,244,197,.07)}
+    .switchline{display:flex;justify-content:space-between;align-items:center;margin-top:20px;color:var(--muted);font-size:13px}.switch{width:42px;height:24px;border-radius:20px;background:#172a28;padding:3px;cursor:pointer}.switch:after{content:"";display:block;width:18px;height:18px;background:var(--muted);border-radius:50%;transition:.25s}.switch.on{background:rgba(117,244,197,.25)}.switch.on:after{transform:translateX(18px);background:var(--mint)}
+    button{width:100%;padding:14px;border:0;border-radius:11px;font-weight:700;cursor:pointer;transition:.25s;font-family:inherit}.primary{background:var(--mint);color:#052019;margin-top:25px;box-shadow:0 9px 26px rgba(117,244,197,.12)}.primary:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(117,244,197,.22)}.secondary{background:rgba(87,199,255,.12);color:var(--cyan);border:1px solid rgba(87,199,255,.25);margin-top:9px}.secondary:disabled,.primary:disabled{opacity:.35;cursor:not-allowed;transform:none}
+    .monitor{min-height:450px;position:relative;padding:28px}.monitor-top{display:flex;justify-content:space-between;gap:16px}.metric strong{display:block;font:32px 'Space Mono';letter-spacing:-.05em}.metric span{color:var(--muted);font-size:12px}.progress{height:3px;background:#142522;margin:24px 0;overflow:hidden}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--mint),var(--cyan));box-shadow:0 0 15px var(--mint);transition:width .4s}
+    .scope{height:275px;position:relative}.scope canvas{width:100%;height:100%}.scanline{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--mint),transparent);opacity:.2;animation:sweep 3s ease-in-out infinite}@keyframes sweep{0%,100%{top:5%}50%{top:95%}}
+    .stage{font:12px 'Space Mono';color:var(--mint);margin-top:12px}.error{color:var(--red)}
+    .results{margin-top:18px;display:none}.results.show{display:block;animation:rise .55s ease both}@keyframes rise{from{opacity:0;transform:translateY(18px)}}.section-head{display:flex;justify-content:space-between;align-items:end;margin:48px 0 18px}.section-head h2{font-size:30px;letter-spacing:-.04em;margin:0}.section-head p{color:var(--muted);margin:0}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.stat{padding:20px}.stat b{font:25px 'Space Mono';display:block}.stat small{color:var(--muted)}
+    .images{display:grid;grid-template-columns:1fr 1fr;gap:14px}.visual{padding:12px}.visual.wide{grid-column:1/-1}.visual h3{font-size:13px;padding:0 8px}.visual img{width:100%;border-radius:12px;display:block;background:white}.frame{height:700px;width:100%;border:0;border-radius:12px;background:white}
+    .archive{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.run{padding:19px;cursor:pointer;transition:.25s}.run:hover{border-color:rgba(117,244,197,.35);transform:translateY(-3px)}.run time{font:13px 'Space Mono';display:block}.run small{color:var(--muted)}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}.hero{align-items:start;flex-direction:column}.stats{grid-template-columns:1fr 1fr}.images{grid-template-columns:1fr}.visual.wide{grid-column:auto}.run-id{text-align:left}.frame{height:520px}}
+  </style>
+</head>
+<body><div class="orb"></div>
+  <header><div class="brand"><div class="mark"><i></i></div>DEPTH ANALYSE</div><div class="status-pill"><i class="dot"></i><span id="systemStatus">SYSTEM READY</span></div></header>
+  <main>
+    <section class="hero"><div><div class="eyebrow">360° impact metrology</div><h1>See beneath<br><span>the surface.</span></h1></div><div class="run-id">ACTIVE RUN<br><strong id="runId">NOT STARTED</strong></div></section>
+    <div class="grid">
+      <aside class="panel pad">
+        <div class="panel-title">Scan configuration</div>
+        <label>Operating mode</label><select id="mode"><option value="dummy">Dummy / simulation</option><option value="real">Real Raspberry Pi</option></select>
+        <label>Sensor backend</label><select id="backend"><option value="auto">Automatic</option><option value="vl53l4cd">VL53L4CD</option><option value="clone">Clone / UL53LDK</option><option value="smbus">Direct SMBus</option></select>
+        <div class="field-row"><div><label>Scan points</label><input id="points" type="number" value="360" min="12" max="1440"></div><div><label>Interval (s)</label><input id="interval" type="number" value="0.2" min="0.01" step="0.01"></div></div>
+        <label>Measured revolution time (s)</label><input id="rotation" type="number" value="72" min="0" step="0.1">
+        <div class="field-row"><div><label>Run pulse (µs)</label><input id="runPulse" type="number" value="1350"></div><div><label>Stop pulse (µs)</label><input id="stopPulse" type="number" value="1500"></div></div>
+        <div class="switchline"><span>Servo enabled</span><div id="servoSwitch" class="switch on"></div></div>
+        <button id="beforeBtn" class="primary">Start before scan</button><button id="afterBtn" class="secondary" disabled>Drop complete — scan after</button>
+      </aside>
+      <section class="panel monitor">
+        <div class="monitor-top"><div class="metric"><strong id="pointCount">0</strong><span>VALID READINGS</span></div><div class="metric"><strong id="angle">0.0°</strong><span>ESTIMATED ANGLE</span></div><div class="metric"><strong id="distance">—</strong><span>DISTANCE MM</span></div></div>
+        <div class="progress"><i id="progressBar"></i></div>
+        <div class="scope"><canvas id="chart"></canvas><div class="scanline"></div></div>
+        <div id="stage" class="stage">Ready for a new scan</div>
+      </section>
+    </div>
+    <section id="results" class="results"><div class="section-head"><div><div class="eyebrow">Analysis complete</div><h2>Before meets after.</h2></div><p>Every artifact is archived in its run folder.</p></div><div id="stats" class="stats"></div><div class="images"><article class="panel visual"><h3>Before profile</h3><img id="beforeImg"></article><article class="panel visual"><h3>After profile</h3><img id="afterImg"></article><article class="panel visual wide"><h3>Comparison & deviation</h3><img id="compareImg"></article><article class="panel visual wide"><h3>Interactive 3D inspection</h3><iframe id="dashboard" class="frame"></iframe></article></div></section>
+    <section><div class="section-head"><div><div class="eyebrow">Run archive</div><h2>Measurement history.</h2></div></div><div id="archive" class="archive"></div></section>
+  </main>
+  <script>
+    const $=id=>document.getElementById(id); let servo=true,lastStage='',activeRun=null;
+    $('servoSwitch').onclick=()=>{servo=!servo;$('servoSwitch').classList.toggle('on',servo)};
+    function settings(){return{mode:$('mode').value,backend:$('backend').value,target_points:+$('points').value,read_interval_s:+$('interval').value,rotation_time_s:+$('rotation').value,servo_run_us:+$('runPulse').value,servo_neutral_us:+$('stopPulse').value,servo_enabled:servo}}
+    async function post(path,body={}){let r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
+    $('beforeBtn').onclick=async()=>{try{await post('/api/before',settings());$('beforeBtn').disabled=true}catch(e){alert(e.message)}};
+    $('afterBtn').onclick=async()=>{try{await post('/api/after');$('afterBtn').disabled=true}catch(e){alert(e.message)}};
+    function draw(points){const c=$('chart'),d=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;const x=c.getContext('2d');x.scale(d,d);x.clearRect(0,0,w,h);x.strokeStyle='rgba(117,244,197,.08)';x.lineWidth=1;for(let i=0;i<6;i++){let y=i*h/5;x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke()}if(points.length<2)return;let vals=points.map(p=>+p.distance_mm),min=Math.min(...vals)-5,max=Math.max(...vals)+5;x.beginPath();points.forEach((p,i)=>{let px=i*w/Math.max(points.length-1,1),py=h-(+p.distance_mm-min)*h/(max-min);i?x.lineTo(px,py):x.moveTo(px,py)});let g=x.createLinearGradient(0,0,w,0);g.addColorStop(0,'#75f4c5');g.addColorStop(1,'#57c7ff');x.strokeStyle=g;x.lineWidth=2;x.shadowBlur=12;x.shadowColor='#75f4c5';x.stroke()}
+    function showResult(r){if(!r)return;activeRun=r.run_id;let base='/runs/'+r.run_id+'/';$('results').classList.add('show');$('beforeImg').src=base+'before.png?'+Date.now();$('afterImg').src=base+'after.png?'+Date.now();$('compareImg').src=base+'comparison.png?'+Date.now();$('dashboard').src=base+'interactive_3d.html';$('stats').innerHTML=[['Alignment',r.alignment_shift_deg+'°'],['Average change',r.avg_change_mm+' mm'],['Deepest change',r.max_deeper_mm+' mm'],['Shallowest',r.max_shallower_mm+' mm']].map(v=>`<div class="panel stat"><b>${v[1]}</b><small>${v[0]}</small></div>`).join('');}
+    async function poll(){try{let s=await fetch('/api/status').then(r=>r.json());$('stage').textContent=s.error?s.error:s.message;$('stage').classList.toggle('error',!!s.error);$('pointCount').textContent=s.points;$('progressBar').style.width=s.progress+'%';$('runId').textContent=s.run_id||'NOT STARTED';$('systemStatus').textContent=s.stage.replaceAll('_',' ').toUpperCase();let p=s.live?.at(-1);if(p){$('angle').textContent=(+p.angle_deg).toFixed(1)+'°';$('distance').textContent=(+p.distance_mm).toFixed(1);draw(s.live)}$('afterBtn').disabled=s.stage!=='awaiting_drop';$('beforeBtn').disabled=['scanning_before','scanning_after','processing','awaiting_drop'].includes(s.stage);if(s.stage==='complete'&&lastStage!=='complete'){showResult(s.result);loadRuns()}lastStage=s.stage}catch(e){}setTimeout(poll,500)}
+    async function loadRuns(){let runs=await fetch('/api/runs').then(r=>r.json());$('archive').innerHTML=runs.map(r=>`<article class="panel run" onclick="openRun('${r.run_id}',${r.complete})"><time>${r.run_id.replace('_',' · ')}</time><small>${r.complete?'Complete analysis':'Incomplete run'}</small></article>`).join('')||'<span style="color:var(--muted)">No archived runs yet.</span>'}
+    async function openRun(id,complete){if(!complete)return;let d=await fetch('/runs/'+id+'/scan_data.json').then(r=>r.json());showResult({run_id:id,alignment_shift_deg:(d.alignment_shift_deg||0).toFixed(3),avg_change_mm:(d.avg_change_mm||0).toFixed(3),max_deeper_mm:(d.max_deeper_mm||0).toFixed(3),max_shallower_mm:(d.max_shallower_mm||0).toFixed(3)});$('results').scrollIntoView({behavior:'smooth'})}
+    addEventListener('resize',()=>{});loadRuns();poll();
+  </script>
+</body>
+</html>
