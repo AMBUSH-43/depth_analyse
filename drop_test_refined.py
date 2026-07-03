@@ -6,7 +6,7 @@ Drop Test - refined Raspberry Pi / dummy scanner.
 What this version adds over the earlier script:
   - CLI mode selection: no need to edit MODE inside the file
   - Dummy mode for laptop development
-  - Real mode for Raspberry Pi VL53L4CD / VL53L4CDK-style sensors
+  - Real mode for Raspberry Pi VL53L0X / VL53L4CD-style sensors
   - Clone-friendly backend for "UL53LDK" style modules
   - Optional real backend: auto, vl53l4cd, clone, or smbus
   - Safer Pi 5 fan GPIO setup with LGPIOFactory when available
@@ -39,16 +39,29 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from importlib import import_module
 from pathlib import Path
 from typing import Callable, Protocol
 
-import matplotlib
+try:
+    matplotlib = import_module("matplotlib")
+    np = import_module("numpy")
+    pd = import_module("pandas")
+except ModuleNotFoundError as exc:
+    missing = exc.name or "required package"
+    print(f"Missing Python package: {missing}", file=sys.stderr)
+    print(
+        "Install the project dependencies with:\n"
+        "  python3 -m venv --system-site-packages .venv\n"
+        "  source .venv/bin/activate\n"
+        "  python3 -m pip install -r requirements.txt",
+        file=sys.stderr,
+    )
+    raise SystemExit(1) from exc
 
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
+plt = import_module("matplotlib.pyplot")
 
 
 # Change this only if you want a file-level default.
@@ -59,9 +72,10 @@ DEFAULT_MODE = "dummy"  # "dummy" or "real"
 @dataclass(frozen=True)
 class Config:
     mode: str = DEFAULT_MODE
-    backend: str = "auto"  # auto, vl53l4cd, clone, smbus
+    backend: str = "auto"  # auto, vl53l0x, vl53l4cd, clone, smbus
     strict_hardware: bool = False
     auto_demo: bool = False
+    sensor_test: bool = False
     strict_identity: bool = False
 
     target_points: int = 360
@@ -191,7 +205,15 @@ class RealServo:
         if not 500 <= cfg.servo_neutral_us <= 2500:
             raise ValueError("--servo-neutral-us must be between 500 and 2500")
 
-        import lgpio
+        try:
+            import lgpio
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "Missing GPIO package 'lgpio'. On Raspberry Pi, install it with "
+                "'sudo apt install -y python3-lgpio' and recreate the venv with "
+                "'python3 -m venv --system-site-packages .venv', then reinstall "
+                "'python3 -m pip install -r requirements.txt'."
+            ) from exc
 
         self.lgpio = lgpio
         last_error: Exception | None = None
@@ -362,6 +384,35 @@ class AdafruitVL53L4CD:
                 pass
 
 
+class AdafruitVL53L0X:
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+        self.sensor = None
+
+    def open(self) -> None:
+        import board
+        import busio
+        import adafruit_vl53l0x
+
+        print("-> Initializing real VL53L0X via Adafruit driver")
+        i2c = busio.I2C(board.SCL, board.SDA)
+        self.sensor = adafruit_vl53l0x.VL53L0X(i2c)
+        try:
+            self.sensor.measurement_timing_budget = 20000
+        except Exception:
+            pass
+        print("-> Real VL53L0X ready")
+
+    def read_mm(self, angle_deg: float, is_after: bool) -> float | None:
+        del angle_deg, is_after
+        if self.sensor is None:
+            raise RuntimeError("Sensor is not open")
+        return sanitize_distance(getattr(self.sensor, "range", None))
+
+    def close(self) -> None:
+        pass
+
+
 class SmbusRegisterVL53:
     """
     Minimal direct-register reader for fake/clone "UL53LDK" style modules.
@@ -489,13 +540,15 @@ def build_sensor(cfg: Config) -> DistanceSensor:
         sensor.open()
         return sensor
 
-    backends = ["vl53l4cd", "clone"] if cfg.backend == "auto" else [cfg.backend]
+    backends = ["vl53l0x", "vl53l4cd", "clone"] if cfg.backend == "auto" else [cfg.backend]
     last_error: Exception | None = None
 
     for backend in backends:
         normalized_backend = "vl53l4cd" if backend == "adafruit" else backend
         sensor: DistanceSensor
-        if normalized_backend == "vl53l4cd":
+        if normalized_backend == "vl53l0x":
+            sensor = AdafruitVL53L0X(cfg)
+        elif normalized_backend == "vl53l4cd":
             sensor = AdafruitVL53L4CD(cfg)
         elif normalized_backend in {"clone", "smbus"}:
             sensor = SmbusRegisterVL53(cfg)
@@ -588,6 +641,21 @@ def run_scan(
     total = time.perf_counter() - start
     print(f"\n{name.upper()} finished - {len(rows)} points in {total:.2f} s")
     return pd.DataFrame(rows)
+
+
+def run_sensor_test(sensor: DistanceSensor, samples: int = 20) -> bool:
+    print("\nSensor test - reading distance without servo")
+    good = 0
+    for index in range(samples):
+        dist = sensor.read_mm(0.0, is_after=False)
+        if dist is None:
+            print(f"{index + 1:02d}: no valid reading")
+        else:
+            good += 1
+            print(f"{index + 1:02d}: {dist:.1f} mm")
+        time.sleep(0.1)
+    print(f"Sensor test finished - {good}/{samples} valid readings")
+    return good > 0
 
 
 def robust_filter_scan(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
@@ -945,12 +1013,13 @@ def parse_args() -> Config:
     parser.add_argument("--mode", choices=["dummy", "real"], default=DEFAULT_MODE)
     parser.add_argument(
         "--backend",
-        choices=["auto", "vl53l4cd", "adafruit", "clone", "smbus"],
+        choices=["auto", "vl53l0x", "vl53l4cd", "adafruit", "clone", "smbus"],
         default="auto",
-        help="auto tries official VL53L4CD first, then clone smbus. 'clone' is best for UL53LDK-style fake modules.",
+        help="auto tries VL53L0X, VL53L4CD, then clone smbus. 'clone' is best for UL53LDK-style fake modules.",
     )
     parser.add_argument("--strict-hardware", action="store_true")
     parser.add_argument("--strict-identity", action="store_true", help="Reject non-genuine VL53L4CD identity values")
+    parser.add_argument("--sensor-test", action="store_true", help="Read sensor samples without servo or scan processing")
     parser.add_argument("--auto-demo", action="store_true", help="Run without keypress prompts")
     parser.add_argument("--target-points", type=int, default=360)
     parser.add_argument("--read-interval", type=float, default=0.20)
@@ -972,6 +1041,7 @@ def parse_args() -> Config:
         backend=args.backend,
         strict_hardware=args.strict_hardware,
         strict_identity=args.strict_identity,
+        sensor_test=args.sensor_test,
         auto_demo=args.auto_demo,
         target_points=args.target_points,
         read_interval_s=args.read_interval,
@@ -994,7 +1064,7 @@ def main() -> int:
     keys = KeyReader()
     fan = RealFan(cfg) if cfg.mode == "real" else MockFan()
     sensor = build_sensor(cfg)
-    servo = build_servo(cfg)
+    servo: Servo = MockServo() if cfg.sensor_test else build_servo(cfg)
 
     print("\n" + "=" * 78)
     print("   DROP TEST - REFINED REAL PI / DUMMY VERSION")
@@ -1006,6 +1076,9 @@ def main() -> int:
     after_raw = pd.DataFrame()
 
     try:
+        if cfg.sensor_test:
+            return 0 if run_sensor_test(sensor) else 1
+
         if cfg.mode == "dummy":
             # build_sensor already opens dummy. This call is harmless but avoids double open.
             pass

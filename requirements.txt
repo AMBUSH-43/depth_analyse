@@ -1,4 +1,5 @@
-lgpio
+# Raspberry Pi GPIO support is installed with apt:
+#   sudo apt install -y python3-lgpio
 adafruit-blinka
 adafruit-circuitpython-vl53l0x
 adafruit-circuitpython-vl53l4cd
