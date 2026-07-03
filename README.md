@@ -45,7 +45,10 @@ python3 src/depth_analyse.py --servo-test
 ## Running a Scan
 
 ```bash
-python3 src/depth_analyse.py
+python3 drop_test_refined.py --mode real --backend vl53l4cd --rotation-time 72
 ```
 
-The MG996R 360-degree servo is speed-controlled, not position-controlled. Tune `SERVO_RUN_US` for direction/speed and `SECONDS_PER_REVOLUTION` for the measured time of one full turn with the real load attached.
+The refined drop test now starts and stops the MG996R for both the before and
+after scans. The defaults use GPIO 18, a 1350 us run pulse, and a 1500 us stop
+pulse. Tune them with `--servo-run-us` and `--servo-neutral-us`; set the measured
+full-turn time with `--rotation-time`. Use `--no-servo` for a sensor-only run.

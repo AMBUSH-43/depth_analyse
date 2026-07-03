@@ -75,6 +75,14 @@ class Config:
     # If you have calibrated servo timing, set it and angles will be time based.
     rotation_time_s: float | None = None
 
+    # MG996R continuous-rotation servo (values copied from the working
+    # src/depth_analyse.py implementation).
+    servo_enabled: bool = True
+    servo_pin: int = 18
+    servo_run_us: int = 1350
+    servo_neutral_us: int = 1500
+    servo_frequency_hz: int = 50
+
     # Direct smbus fallback settings.
     i2c_bus: int = 1
     i2c_addr: int = 0x29
@@ -145,6 +153,113 @@ class DistanceSensor(Protocol):
 
     def close(self) -> None:
         ...
+
+
+class Servo(Protocol):
+    def start(self) -> None:
+        ...
+
+    def stop(self) -> None:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
+class MockServo:
+    def start(self) -> None:
+        print("-> Mock servo running")
+
+    def stop(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+class RealServo:
+    """MG996R continuous servo control using the project's working lgpio method."""
+
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+        self.lgpio = None
+        self.handle = None
+        self.closed = False
+
+        if not 500 <= cfg.servo_run_us <= 2500:
+            raise ValueError("--servo-run-us must be between 500 and 2500")
+        if not 500 <= cfg.servo_neutral_us <= 2500:
+            raise ValueError("--servo-neutral-us must be between 500 and 2500")
+
+        import lgpio
+
+        self.lgpio = lgpio
+        last_error: Exception | None = None
+        for chip in (4, 0):
+            try:
+                self.handle = lgpio.gpiochip_open(chip)
+                break
+            except Exception as exc:
+                last_error = exc
+        if self.handle is None:
+            raise RuntimeError(f"Could not open GPIO chip for servo: {last_error}")
+
+        try:
+            try:
+                lgpio.gpio_free(self.handle, cfg.servo_pin)
+            except Exception:
+                pass
+            lgpio.gpio_claim_output(self.handle, cfg.servo_pin)
+            self.stop()
+        except Exception:
+            lgpio.gpiochip_close(self.handle)
+            self.handle = None
+            raise
+
+        print(
+            f"-> Servo ready on GPIO {cfg.servo_pin} "
+            f"(run {cfg.servo_run_us} us, stop {cfg.servo_neutral_us} us)"
+        )
+
+    def _set_pulse(self, microseconds: int) -> None:
+        if self.closed or self.lgpio is None or self.handle is None:
+            raise RuntimeError("Servo is closed")
+        duty = (microseconds / 20000.0) * 100.0
+        self.lgpio.tx_pwm(
+            self.handle,
+            self.cfg.servo_pin,
+            self.cfg.servo_frequency_hz,
+            duty,
+        )
+
+    def start(self) -> None:
+        self._set_pulse(self.cfg.servo_run_us)
+        print(f"-> Servo running at {self.cfg.servo_run_us} us")
+
+    def stop(self) -> None:
+        if not self.closed:
+            self._set_pulse(self.cfg.servo_neutral_us)
+
+    def close(self) -> None:
+        if self.closed:
+            return
+        try:
+            self.stop()
+        finally:
+            self.closed = True
+            if self.lgpio is not None and self.handle is not None:
+                try:
+                    self.lgpio.gpio_free(self.handle, self.cfg.servo_pin)
+                except Exception:
+                    pass
+                self.lgpio.gpiochip_close(self.handle)
+                self.handle = None
+
+
+def build_servo(cfg: Config) -> Servo:
+    if cfg.mode != "real" or not cfg.servo_enabled:
+        return MockServo()
+    return RealServo(cfg)
 
 
 class DummyVL53L4CD:
@@ -411,6 +526,7 @@ def angle_for_sample(index: int, elapsed_s: float, cfg: Config) -> float:
 
 def run_scan(
     sensor: DistanceSensor,
+    servo: Servo,
     cfg: Config,
     keys: KeyReader,
     name: str,
@@ -427,40 +543,45 @@ def run_scan(
     else:
         print(f"\n{name.upper()} scan started - running {duration_s:.2f} s")
 
-    while True:
-        now = time.perf_counter()
-        elapsed = now - start
+    servo.start()
+    try:
+        while True:
+            now = time.perf_counter()
+            elapsed = now - start
 
-        if duration_s is not None and elapsed >= duration_s:
-            break
-        if duration_s is None and len(rows) >= cfg.target_points:
-            break
+            if duration_s is not None and elapsed >= duration_s:
+                break
+            if duration_s is None and len(rows) >= cfg.target_points:
+                break
 
-        angle = angle_for_sample(index, elapsed, cfg)
-        dist = sensor.read_mm(angle, is_after=is_after)
+            angle = angle_for_sample(index, elapsed, cfg)
+            dist = sensor.read_mm(angle, is_after=is_after)
 
-        if dist is not None:
-            rows.append(
-                {
-                    "scan": name,
-                    "timestamp_s": elapsed,
-                    "angle_deg": angle,
-                    "distance_mm": dist,
-                }
-            )
-            print(
-                f"\r  {len(rows):3d} pts | {dist:7.2f} mm | {angle:6.1f} deg",
-                end="",
-                flush=True,
-            )
+            if dist is not None:
+                rows.append(
+                    {
+                        "scan": name,
+                        "timestamp_s": elapsed,
+                        "angle_deg": angle,
+                        "distance_mm": dist,
+                    }
+                )
+                print(
+                    f"\r  {len(rows):3d} pts | {dist:7.2f} mm | {angle:6.1f} deg",
+                    end="",
+                    flush=True,
+                )
 
-        if not auto and keys.has_key(0.0):
-            keys.read_key()
-            print("\nManual stop")
-            break
+            if not auto and keys.has_key(0.0):
+                keys.read_key()
+                print("\nManual stop")
+                break
 
-        index += 1
-        time.sleep(cfg.read_interval_s)
+            index += 1
+            time.sleep(cfg.read_interval_s)
+    finally:
+        servo.stop()
+        print("\n-> Servo stopped")
 
     total = time.perf_counter() - start
     print(f"\n{name.upper()} finished - {len(rows)} points in {total:.2f} s")
@@ -834,6 +955,10 @@ def parse_args() -> Config:
     parser.add_argument("--smooth-window", type=int, default=7)
     parser.add_argument("--outlier-threshold", type=float, default=50.0)
     parser.add_argument("--rotation-time", type=float, default=0.0, help="Seconds per 360 deg; 0 uses point index")
+    parser.add_argument("--no-servo", action="store_true", help="Disable servo output in real mode")
+    parser.add_argument("--servo-pin", type=int, default=18, help="Servo signal BCM GPIO (default: 18)")
+    parser.add_argument("--servo-run-us", type=int, default=1350, help="Continuous rotation pulse in microseconds")
+    parser.add_argument("--servo-neutral-us", type=int, default=1500, help="Servo stop pulse in microseconds")
     parser.add_argument("--max-align-shift", type=float, default=45.0, help="Maximum before/after circular alignment shift in degrees")
     parser.add_argument("--distance-reg", default="auto", help="Clone/smbus distance register: auto, 0x14, or 0x1E")
     parser.add_argument("--no-fan", action="store_true")
@@ -852,6 +977,10 @@ def parse_args() -> Config:
         outlier_threshold_mm=args.outlier_threshold,
         max_align_shift_deg=args.max_align_shift,
         rotation_time_s=args.rotation_time if args.rotation_time > 0 else None,
+        servo_enabled=not args.no_servo,
+        servo_pin=args.servo_pin,
+        servo_run_us=args.servo_run_us,
+        servo_neutral_us=args.servo_neutral_us,
         distance_reg=None if str(args.distance_reg).lower() == "auto" else int(str(args.distance_reg), 16),
         fan_enabled=not args.no_fan,
         dashboard_html=args.dashboard,
@@ -863,6 +992,7 @@ def main() -> int:
     keys = KeyReader()
     fan = RealFan(cfg) if cfg.mode == "real" else MockFan()
     sensor = build_sensor(cfg)
+    servo = build_servo(cfg)
 
     print("\n" + "=" * 78)
     print("   DROP TEST - REFINED REAL PI / DUMMY VERSION")
@@ -883,17 +1013,17 @@ def main() -> int:
             pass
 
         if cfg.auto_demo:
-            before_raw = run_scan(sensor, cfg, keys, "before", False, None, auto=True)
+            before_raw = run_scan(sensor, servo, cfg, keys, "before", False, None, auto=True)
             duration = max(0.1, float(before_raw["timestamp_s"].max()) if not before_raw.empty else cfg.target_points * cfg.read_interval_s)
-            after_raw = run_scan(sensor, cfg, keys, "after", True, duration, auto=True)
+            after_raw = run_scan(sensor, servo, cfg, keys, "after", True, duration, auto=True)
         else:
             keys.wait_for("1", "\nPress 1 to start BEFORE scan")
-            before_raw = run_scan(sensor, cfg, keys, "before", False, None, auto=False)
+            before_raw = run_scan(sensor, servo, cfg, keys, "before", False, None, auto=False)
 
             duration = max(0.1, float(before_raw["timestamp_s"].max()) if not before_raw.empty else 0.0)
             print("\nDo the drop now.")
             keys.wait_for("2", f"Press 2 to start AFTER scan ({duration:.2f} s)")
-            after_raw = run_scan(sensor, cfg, keys, "after", True, duration, auto=False)
+            after_raw = run_scan(sensor, servo, cfg, keys, "after", True, duration, auto=False)
 
         profile, shift_deg = build_profile(before_raw, after_raw, cfg)
         print_summary(profile, shift_deg)
@@ -911,6 +1041,7 @@ def main() -> int:
         print(f"\nError: {exc}")
         return 1
     finally:
+        servo.close()
         fan.off()
         sensor.close()
         print("Fan OFF")
