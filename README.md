@@ -32,11 +32,15 @@ Raspberry Pi 5 based **groove detection system** using continuous rotation servo
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install dependencies
-sudo apt install -y python3-pip python3-dev libatlas-base-dev
+# Install system dependencies
+sudo apt install -y python3-pip python3-dev python3-venv libatlas-base-dev python3-lgpio
 
-# Install Python packages
-pip3 install -r requirements.txt
+# Create a venv that can see Raspberry Pi system GPIO packages
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+
+# Install project Python packages
+python3 -m pip install -r requirements.txt
 
 # Test only the servo
 python3 src/depth_analyse.py --servo-test
@@ -45,8 +49,13 @@ python3 src/depth_analyse.py --servo-test
 ## Running a Scan
 
 ```bash
+python3 drop_test_refined.py --mode real --sensor-test
 python3 drop_test_refined.py --mode real --backend vl53l4cd --rotation-time 72
 ```
+
+Use `--backend vl53l0x` if the connected board is a VL53L0X. The default
+`--backend auto` tries VL53L0X first, then VL53L4CD, then the clone register
+reader.
 
 The refined drop test now starts and stops the MG996R for both the before and
 after scans. The defaults use GPIO 18, a 1350 us run pulse, and a 1500 us stop
@@ -56,7 +65,6 @@ full-turn time with `--rotation-time`. Use `--no-servo` for a sensor-only run.
 ## Web control panel
 
 ```bash
-.venv/bin/pip install -r requirements.txt
 .venv/bin/python web_app.py
 ```
 
@@ -64,3 +72,26 @@ Open `http://localhost:5000` on the Pi, or `http://<pi-address>:5000` from
 another device on the same network. Each run is saved under a timestamped
 `scans/YYYY-MM-DD_HH-MM-SS/` folder with the before, after, comparison,
 interactive dashboard, raw data and processed profile.
+
+## Troubleshooting
+
+If you see `ModuleNotFoundError: No module named 'pandas'`, you are probably
+running outside the virtual environment. Run:
+
+```bash
+cd ~/depth_analyse
+source .venv/bin/activate
+python3 drop_test_refined.py
+```
+
+If you see `ModuleNotFoundError: No module named 'lgpio'`, install Raspberry Pi's
+GPIO package and recreate the venv so it can see system packages:
+
+```bash
+cd ~/depth_analyse
+sudo apt install -y python3-lgpio
+rm -rf .venv
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+```
