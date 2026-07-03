@@ -65,7 +65,7 @@ def config_from_payload(payload: dict[str, Any], run_dir: Path) -> Config:
     rotation = float(payload.get("rotation_time_s", 0) or 0)
     return Config(
         mode=mode if mode in {"dummy", "real"} else "dummy",
-        backend=backend if backend in {"auto", "vl53l4cd", "adafruit", "clone", "smbus"} else "auto",
+        backend=backend if backend in {"auto", "vl53l0x", "vl53l4cd", "adafruit", "clone", "smbus"} else "auto",
         strict_hardware=bool(payload.get("strict_hardware", mode == "real")),
         target_points=points,
         read_interval_s=interval,

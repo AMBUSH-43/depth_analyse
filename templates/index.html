@@ -36,7 +36,7 @@
       <aside class="panel pad">
         <div class="panel-title">Scan configuration</div>
         <label>Operating mode</label><select id="mode"><option value="dummy">Dummy / simulation</option><option value="real">Real Raspberry Pi</option></select>
-        <label>Sensor backend</label><select id="backend"><option value="auto">Automatic</option><option value="vl53l4cd">VL53L4CD</option><option value="clone">Clone / UL53LDK</option><option value="smbus">Direct SMBus</option></select>
+        <label>Sensor backend</label><select id="backend"><option value="auto">Automatic</option><option value="vl53l0x">VL53L0X</option><option value="vl53l4cd">VL53L4CD</option><option value="clone">Clone / UL53LDK</option><option value="smbus">Direct SMBus</option></select>
         <div class="field-row"><div><label>Scan points</label><input id="points" type="number" value="360" min="12" max="1440"></div><div><label>Interval (s)</label><input id="interval" type="number" value="0.2" min="0.01" step="0.01"></div></div>
         <label>Measured revolution time (s)</label><input id="rotation" type="number" value="72" min="0" step="0.1">
         <div class="field-row"><div><label>Run pulse (µs)</label><input id="runPulse" type="number" value="1350"></div><div><label>Stop pulse (µs)</label><input id="stopPulse" type="number" value="1500"></div></div>
