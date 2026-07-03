@@ -1,9 +1,11 @@
-cat > .gitignore << EOF
 __pycache__/
 *.pyc
 *.pyo
+.venv/
+.env
 *.csv
 *.png
 *.log
-.env
-EOF
+scan_data.json
+drop_scan_dashboard.html
+scans/

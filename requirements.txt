@@ -1,5 +1,10 @@
 lgpio
 adafruit-blinka
 adafruit-circuitpython-vl53l0x
+adafruit-circuitpython-vl53l4cd
+gpiozero
 numpy
 matplotlib
+pandas
+plotly
+flask

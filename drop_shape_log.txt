@@ -1,0 +1,10 @@
+
+=== 2026-07-03 12:54:39 | MODE=DUMMY ===
+Raw CSV: /home/inian/Projects/Depth Analysis/depth_analyse/scan_raw.csv
+Profile CSV: /home/inian/Projects/Depth Analysis/depth_analyse/scan_profile.csv
+JSON: /home/inian/Projects/Depth Analysis/depth_analyse/scan_data.json
+Dashboard: /home/inian/Projects/Depth Analysis/depth_analyse/drop_scan_dashboard.html
+Alignment shift: -1.00 deg
+Avg change: +3.786 mm
+Max deeper: +29.794 mm
+Max shallower: -8.913 mm
