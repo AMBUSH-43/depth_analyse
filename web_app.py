@@ -30,6 +30,7 @@ from drop_test_refined import (
 ROOT = Path(__file__).resolve().parent
 SCAN_ROOT = ROOT / "scans"
 SCAN_ROOT.mkdir(exist_ok=True)
+RASPBERRY_PI_5_URL = "https://www.raspberrypi.com/products/raspberry-pi-5/"
 
 app = Flask(__name__)
 lock = threading.Lock()
@@ -152,7 +153,7 @@ def scan_worker(phase: str) -> None:
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", raspberry_pi_5_url=RASPBERRY_PI_5_URL)
 
 
 @app.get("/api/status")
